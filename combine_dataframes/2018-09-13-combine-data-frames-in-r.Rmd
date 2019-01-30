@@ -5,6 +5,9 @@ date: '2018-09-13'
 slug: combine-data-frames-in-r
 categories: [Tutorials]
 tags: [dplyr, joins, combine]
+output:
+  md_document:
+    variant: markdown_github
 ---
 Sometimes, before we start to explore our data, we need to put them together. For instance, we might have them stored in different data frames and we have to join variables from two or more data frames in one. This post will talk about the different functions  we can use to achieve that goal. We will be using the `dplyr` package to combine different data frames.
 
