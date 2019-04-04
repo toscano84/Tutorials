@@ -21,11 +21,12 @@ head(20) %>% # only the first 20 rows
 kable() 
 
 
-# check the lat 20 rows
+# check the last 20 rows
 euro_vs_dollar %>%
 tail(20) %>% # only the first 20 rows
 kable() 
 
+# explore data
 glimpse(euro_vs_dollar)
 
 # create new data frame
@@ -40,20 +41,20 @@ euro_dollar_parse <- euro_vs_dollar %>%
                           date == "2017-07-12" ~ "2017, 12th July",
                           TRUE ~ date))
 
+# explore data
 glimpse(euro_dollar_parse)
 
+# use parse_date_time
 euro_vs_dollar_tbl <- euro_dollar_parse %>%
   # parse the four different formats of the date variable 
   mutate(date = parse_date_time(date, c("mdy", "ymd", "dmy", "ydm")))
+ 
 
-glimpse(euro_vs_dollar_tbl) 
-
-
+# use ymd() function
 euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
   mutate(date = ymd(date))
 
-glimpse(euro_vs_dollar_tbl)
-
+# create year, month, day of the month, week day, day of the yea, and quarter
 euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
   mutate(# variable year
     year = year(date), 
@@ -73,10 +74,12 @@ euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
     # variable quarter
     qter = quarter(date)) 
 
+# check table of the data frame - first 25 cases
 euro_vs_dollar_tbl %>%
   head(25) %>%
   kable()
 
+# example of make_date() function to create a date type variable
 euro_vs_dollar_tbl %>%
   mutate(new_year_var = make_date(
     year = year, 
@@ -85,10 +88,12 @@ euro_vs_dollar_tbl %>%
   select(new_year_var, everything())
 
 
+# use first and last functions of the xts package
 euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
   mutate(first_date = xts::first(date),
 
-         
+
+# use interval function to check the number of days that the EURO currency has
 euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
   # create euro_life variable
   mutate(euro_life = interval(first_date, last_date) / ddays(1))
@@ -96,6 +101,7 @@ euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
 euro_vs_dollar_tbl$euro_life[1]
 
 
+# difference in the exchange rate of the EURO vs the DOLLAR from the beginning until today(2019-04-04)
 euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
   mutate(first_value = xts::first(value),
          last_value = xts::last(value),
@@ -103,7 +109,7 @@ euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
 
 euro_vs_dollar_tbl$diff_value[1]
 
-
+# the percent difference - use if scales::percent()
 euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
   mutate(
     # create difference in value
@@ -113,6 +119,7 @@ euro_vs_dollar_tbl <- euro_vs_dollar_tbl %>%
 
 euro_vs_dollar_tbl$perc_dif[1]
 
+# check floor_date, ceiling_date, and round_date functions
 euro_vs_dollar_tbl %>%
   mutate(
     floor_d = floor_date(date, "months"),
@@ -125,7 +132,7 @@ euro_vs_dollar_tbl %>%
   kable()
 
 
-
+# check lag function from dplyr
 euro_vs_dollar_tbl %>%
   mutate(lag_value =lag(value, n =1)) %>%
   mutate(lag_value = case_when(is.na(lag_value) ~ value,
@@ -135,6 +142,7 @@ euro_vs_dollar_tbl %>%
   head(10) %>%
   kable()
 
+# check rollmean to see how averages move through time
 euro_vs_dollar_tbl %>%
   mutate(sum_five_d = zoo::rollmean(value, 
                                     k = 5, na.pad = TRUE, 
@@ -144,7 +152,7 @@ euro_vs_dollar_tbl %>%
   head(10) %>% 
   kable()
 
-
+# check the %m+% function
 euro_vs_dollar_tbl %>%
   filter(date == ymd("2007-07-20") %m+% months(1)) %>%
 
