@@ -1,0 +1,412 @@
+---
+title: 'Iteration made easier: A case study with purrr'
+author: Hugo Toscano
+date: '2019-06-23'
+slug: iteration-made-easier-a-case-study-with-purrr
+categories: [Tutorials]
+tags: [purrr, tidytuesday, tidyverse]
+---
+This tutorial will be about iteration in R. More specifically, I'll focus on some functions of the `purrr` package. Feedback is welcomed. The dataset I will manipulate is from the week 22 of [TidyTuesday](https://github.com/rfordatascience/tidytuesday) and it's called `Wine Ratings`. This dataset is very informative about types of wines and its origins as well as the respective prices and points attributed. Moreover, it's very detailed in regard to critical reviews and information about critics.
+
+To begin, let's load the libraries that we'll use for this post.
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse) # manipulate, iterate, and visualize data
+library(fs) # create directory
+library(here) # set a path to your file
+library(data.table) # in this case it's used to write and open files
+library(ggdark) # ggplot2 theme
+library(extrafont) # add fonts
+library(hrbrthemes) # add fonts in this case
+```
+
+Now, we'll open our dataset.
+
+```{r}
+# open dataset
+wine_ratings <- fread("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-05-28/winemag-data-130k-v2.csv")
+```
+
+
+For tutorial purposes, let's create 3 different datasets based on the `wine_ratings` dataset and put them together as a list, called `wine_list`.
+
+
+```{r}
+# create 3 datasets
+# wine1 with colums 2 to 7 of wine_new 
+wine1 <- wine_ratings %>%
+  select(2:7) # delete column 1
+# wine2 with colums 8 to 11 of wine_new 
+wine2 <- wine_ratings %>% 
+  select(8:11)
+# wine3 with colums 12 to 14 of wine_new 
+wine3 <- wine_ratings %>% 
+  select(12:14)
+
+# create list with the 3 datasets
+wine_list <- list(wine1 = wine1, wine2 = wine2, wine3 = wine3)
+
+
+
+head(wine_list)
+```
+
+
+### Saving and Opening multiple files: map()
+So, now that we have a list with 3 datasets, how can we save these 3 files separately in our computer. Here comes into play the amazing `map()` function from the `purrr` package. Using `map()` together with the function `fwrite` from the `data.table` package, we can iterate the process of saving files in a simpler way. In our case, we can separately save the 3 datasets from our list. 
+
+```{r}
+# save files in a directory
+wine <- wine_list %>%
+  names(.) %>%
+  map(~fwrite(wine_list[[.]], str_c("C:/Users/Diana/Downloads/hugoblog/wine/", ., ".csv")))
+
+
+```
+
+
+Let's now do the reverse. Open together the 3 files. First, we create a directory path.
+
+```{r}
+# create a path by adding the subdirectory to the here function
+path_wine <- fs::dir_info(path = here::here("wine"))
+```
+
+
+Then, we `pull` the path and use `map()` together with `fread` to open the 3 datasets.
+
+```{r message=FALSE, warning=FALSE}
+# pull the path 
+wine <- path_wine %>% 
+  pull(path)
+
+
+# opening multiples files with purrr
+wine_list_purrr <- wine %>%
+  map(fread) %>%
+  set_names(., c("wine1", "wine2", "wine3"))
+
+head(wine_list_purrr)
+```
+
+We can check each dataset from our list using double brackets with the correspondent index. 
+
+```{r}
+# wine1
+head(wine_list_purrr[[1]])
+#wine2
+head(wine_list_purrr[[2]])
+#wine3
+head(wine_list_purrr[[3]])
+
+
+```
+
+### Extract elements from a list: map() again
+One amazing feature of `purrr` is the ability to extract elements from a list. Again, with `map` we could simply put in double brackets the element of the list we wanted. Then, we could use `flatten_chr`, to unlist and turn the output into a character vector.
+
+```{r}
+map(wine_list_purrr, ~.x[["country"]]) %>%  flatten_chr() %>%  unique()
+
+```
+
+With only one line of code, it turns out that there are 44 wine producing countries.
+
+
+#### Check the length and number of cases of a list: map_dbl()/map_int()
+
+Now, we have our list and we want to know the length of each variable present in datasets. In that case, we could simply use map_dbl()/map_int() which is similar to map(), but it returns a vector, in this case numeric, instead of a list.
+
+
+```{r}
+# number of rows/cases in our list
+map_dbl(wine_list_purrr, ~nrow(.x))
+
+map_int(wine_list_purrr, ~nrow(.x))
+```
+
+As we can see, we have around 130 thousand wine reviews. If we wanted the length of each list, we could use `length` instead of `nrow()`.
+
+
+```{r}
+map_dbl(wine_list_purrr, ~length(.x))
+map_int(wine_list_purrr, ~length(.x))
+```
+
+Therefore, we have 6 variables in the first dataset, and 4 and 3 variables in the remaining ones included in our list.
+
+
+#### map_lgl()
+We can confirm what has been written above, using the `map_lgl()` that returns a logical vector. The first element of the list has 6 variables, the second 4 variables and the third 3 variables.
+
+
+```{r}
+map_lgl(wine_list_purrr, ~ncol(.x) == 6)
+map_lgl(wine_list_purrr, ~ncol(.x) == 4)
+map_lgl(wine_list_purrr, ~ncol(.x) == 3)
+
+```
+
+
+### From a list to a data frame: reduce()
+How can we transform our list with 3 data frames in one data frame? We can do this by using the `reduce` function from `purrr`. In this case, we just add the `data.frame` function after the list argument.
+
+
+```{r}
+# use reduce to create a data frame from a list
+wine_total <- purrr::reduce(wine_list_purrr, data.frame)
+
+# check the structure of our data frame
+glimpse(wine_total)
+
+# to confirm if we have a data frame
+is.data.frame(wine_total)
+```
+
+
+### Computations with map()
+Returning to our `map()` functions, if we wanted to know the average price and review points of the wines from our data frame, we could use `map_dbl()` to do so.
+Note: `map_int()` doesn't work here because the computation of the mean of these variables is not an integer.
+
+
+```{r}
+
+wine_total %>%
+  select_if(is.numeric) %>%
+  map_dbl(., ~.x %>% mean(, na.rm = TRUE))
+
+```
+
+That is, the average punctuation is 88.45 and the average price is 35.36 dollars.
+
+
+### Iterating over two or more lists: map2() and pmap()
+In some of the examples above with `map()` we used only one list, but there are cases where we can have two or more lists to manipulate. Let's now create three lists where each one corresponds to one of the 3 datasets above.
+
+```{r}
+# create new lists
+list1 <- list(wine1)
+list2 <- list(wine2)
+list3 <- list(wine3)
+```
+
+When we want to manipulate two lists simultaneously, we can use `map2()`. This function works similarly to `map`, the difference is that the function, iterates over two lists, instead of one as in `map()`. In this example, we created a list by iterating the function `data.frame` over two lists. Thus, we've put together the two lists in one list called map2_ex.
+
+```{r}
+# map2 and pmap
+map2_ex <- map2(list1, list2, data.frame)
+
+# check the list
+glimpse(map2_ex)
+```
+
+However, we created three lists. In this scenario , we should use the `pmap()` function which works differently than `map()` and `map2()`. With `pmap()` the first argument is the list that has all the 3 lists within. Then we have to create a function with each list, plus the corresponding function we want to iterate over the 3 lists.
+
+```{r}
+# pmap()
+list_total <- list(list1,
+                   list2,
+                   list3)
+
+pmap_ex <- pmap(list_total,
+                function(list1, list2, list3)
+                  data.frame(list1, list2, list3))
+# check the list
+glimpse(pmap_ex)
+```
+
+
+### Iterate plots: walk()
+The `walk()` function from `purrr` works much like `map()` because we also have to add two arguments to it. We supply the name of the list as the first argument, and the second argument corresponds to the name of the function that we want to apply. Moreover, `walk()` is really handy when you  want to make plots in succession. In the example below, we'll use `walk()` to print six scatterplots of the top 6 wine producing countries. 
+
+
+```{r message=FALSE, warning=FALSE}
+# walk
+# create data frame with the top 6 countries
+top_6countries <- wine_total %>%
+  count(country) %>%
+  arrange(desc(n)) %>%
+  slice(1:6)
+
+# create a list with all the variables, but only with data from the top 6 countries
+wine_split <- wine_total %>%
+  filter(country %in% top_6countries$country) %>%
+  split(.$country)
+  
+
+
+
+# create plots with map2 and gggplot2
+plots <- map2(wine_split[1:6], # two lists added because it's map2() - 
+              ## in this case the data and the columns' names 
+              names(wine_split[1:6]),
+              # add the function - in this case a ggplot function
+              ~ ggplot(.x, aes(log(price), points)) + 
+                geom_point(colour = "red", alpha = 0.3, size = 2.3) +
+                # add a theme
+                dark_theme_gray() +
+  theme(plot.title = element_text(family = "Cooper Black", face = "bold",
+                                  size = 40, hjust = 0.5),
+        plot.subtitle = element_text(family = "Cooper Black", face = "bold",
+                                     size = 18, hjust = 0.5),
+        plot.background = element_rect(fill = "grey10"),
+        panel.background = element_blank(),
+        panel.grid.major = element_line(color = "grey30", size = 0.2),
+        panel.grid.minor = element_line(color = "grey30", size = 0.2),
+        legend.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_text(family = "Cooper Black", size = 15),
+        axis.text = element_text(family = "Cooper Black", size = 15),
+        legend.key = element_blank(),
+        strip.background = element_blank(),
+        
+legend.title = element_text(family = "", size = 15)) +
+                labs(title = .y,
+                     subtitle = "Wine Prices and Points given by critics",
+                     x = "log(Price)",
+                     y = "Points"))  
+  
+  
+# walk to print the 6 plots
+# it has 2 arguments: the first argument, a list called plots; and the second argument, the function # that we want to apply
+walk(plots, print)
+
+```
+
+
+
+### Changing some variables data: modify()
+If we want to change the variables and keep the format as a data frame, `modify()` is the function from `purrr` to apply. We can think in centering our numeric variables, price and points. We can do that by using `modify()` and `scale` as the argument. In this case, visible in the second example, we could also use `modify_if()` and `is.numeric` as the first argument.
+
+
+```{r}
+# modify
+wine_total_scale <- wine_total %>%
+  select(price, points) %>%
+  modify(~ scale(.x))
+
+head(wine_total_scale)
+
+# modify_if
+wine_total_scale2 <- wine_total %>%
+  modify_if(is.numeric, ~ scale(.x))
+
+
+head(wine_total_scale2)
+
+```
+
+
+
+### Predicate functionals
+
+The `purrr` package provides us with some additional neat functions. The ones  presented now are predicate functionals. In these functionals, the first argument is always the list or the data frame, and the second argument the function. 
+
+#### detect(), detect_index()
+The first two that we'll be showing are `detect()` and `detect_index()`. The `detect()` as the name implies detects the first match of the function that we use as second argument. In the example below, its output corresponds to the values of our first character variable present in the data set. The `detect_index()` function output gives us the index position of our first numeric variable.
+
+
+```{r}
+# detect
+detect(wine_total, is.character) %>%
+  head()
+
+# detect_index
+detect_index(wine_total, is.numeric) %>% 
+  head()
+```
+
+
+#### keep() and discard()
+The next two are: `keep()` and `discard()`. As both names imply, `keep()` keeps all the elements matching the function used as second argument, and `discard()` discards all the matched elements. Using the second argument `is.numeric` with the `keep()` function only the numeric variables are maintained, while with `discard()`all variables, but the numeric ones are kept.
+
+```{r}
+# keep and discard
+glimpse(purrr::keep(wine_total, is.numeric))
+
+glimpse(purrr::discard(wine_total, is.numeric))
+
+
+```
+
+These functions are also useful when you want to keep or discard columns with  a certain value. In the examples, we want to keep or discard only columns that have the value "Portugal".
+
+```{r}
+# with keep() we keep only the columns that have the input "Portugal"
+glimpse(purrr::keep(wine_total, ~any(.x == "Portugal")))
+```
+
+```{r}
+# with discard() we remove the columns that have the input "Portugal"
+glimpse(purrr::discard(wine_total, ~any(.x == "Portugal")))
+```
+
+#### some() and every()
+Finally, some() and every() functions return either some or every element matching the second argument. In the code below, the output is either a  character variable in our data frame,  or every variable as  numeric.
+
+
+```{r}
+
+# some and every
+some(wine_total, is.character)
+every(wine_total, is.numeric)
+```
+
+
+### imap()
+The `imap()` functions enables you to iterate with an index. In the first example, it returns the twentieth value present in each column.
+In the second example, we create a new column (new_col) in each data frame from our list. The values of this new column correspond to the name of each data frame (wine1, wine2, and wine3).
+
+```{r}
+# first example
+# iterate over an index. It returns the 20th value of each variable  
+head(imap(wine_total, ~ paste0("The twentieth value of ", .y, " is ", .x[[20]])))
+
+
+# second example
+# iterate over a list by creating a new column in each data frame present in the list
+wine_imap_list <- imap(wine_list_purrr, ~mutate(.x, new_col = .y))
+
+glimpse(wine_imap_list)
+```
+
+
+### Create and Change functions: compose() and partial()
+To finalize with this `purrr` tutorial, we'll describe two functions: `compose()` and `partial()`. With `compose` we can create functions. For instance, in the example below, we're composing a function that is exactly as `sum(is.na())`.
+
+
+```{r}
+#compose new function
+sum_na <- purrr::compose(sum, is.na)
+
+# check if the new function is equivalent
+sum_na(wine_total) == sum(is.na(wine_total))
+
+```
+
+With `partial` we can change how certain functions work. For instance, in R when we want to compute averages of a variable(s) containing missing values we must put the argument `na.rm = TRUE` to get an output that is not NA. This is displayed in the first case below in which `na.rm  = TRUE` was not applied, whereas in the second example we get a numeric output by using the argument.
+
+
+```{r}
+mean(wine_total$price)
+```
+```{r}
+mean(wine_total$price, na.rm = TRUE)
+```
+
+With `partial()` we could simply change the `mean()` function by using `na.rm = TRUE` as the second argument. In that case, we can compute variables with missing values without adding the argument `na.rm` .
+
+```{r}
+# partial
+mean_without_rm <- partial(mean, na.rm = TRUE)
+
+mean_without_rm(wine_total$price)
+```
+
+These are just two simple examples, though they show  the potential of functions such as `compose()` and `partial()`.
+
+## Conclusion
+This post tried its best to highlight some of the most important `purrr` functions. I really hope you enjoyed how powerful this package can be. Keep learning and coding!!
+
+
+
